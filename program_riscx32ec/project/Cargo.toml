@@ -1,0 +1,18 @@
+[package]
+name = "project"
+version = "0.1.0"
+edition = "2024"
+
+[profile.dev]
+opt-level = 's'
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[[bin]]
+name = "project"
+harness = false  # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
+[dependencies]
+riscx32 = { path = "../riscx32" }

@@ -1,0 +1,21 @@
+{
+ "Device" : "GW2AR-18C",
+ "Files" : [
+  {
+   "Path" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/main.v",
+   "Type" : "verilog"
+  },
+  {
+   "Path" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+   "Type" : "verilog"
+  }
+ ],
+ "IncludePath" : [
+
+ ],
+ "LoopLimit" : 2000,
+ "ResultFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/impl/temp/rtl_parser.result",
+ "Top" : "main",
+ "VerilogStd" : "verilog_2001",
+ "VhdlStd" : "vhdl_93"
+}

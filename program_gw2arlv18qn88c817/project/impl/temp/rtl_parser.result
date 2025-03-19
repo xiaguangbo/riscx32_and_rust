@@ -1,0 +1,72 @@
+[
+ {
+  "InstFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/main.v",
+  "InstLine" : 3,
+  "InstName" : "main",
+  "ModuleFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/main.v",
+  "ModuleLine" : 3,
+  "ModuleName" : "main",
+  "SubInsts" : [
+   {
+    "InstFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/main.v",
+    "InstLine" : 28,
+    "InstName" : "riscx32_core",
+    "ModuleFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+    "ModuleLine" : 84,
+    "ModuleName" : "riscx32"
+   }
+  ]
+ },
+ {
+  "InstFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+  "InstLine" : 2219,
+  "InstName" : "riscx32_regs",
+  "ModuleFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+  "ModuleLine" : 2219,
+  "ModuleName" : "riscx32_regs"
+ },
+ {
+  "InstFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+  "InstLine" : 2562,
+  "InstName" : "riscx32_axi",
+  "ModuleFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+  "ModuleLine" : 2562,
+  "ModuleName" : "riscx32_axi",
+  "SubInsts" : [
+   {
+    "InstFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+    "InstLine" : 2664,
+    "InstName" : "axi_adapter",
+    "ModuleFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+    "ModuleLine" : 2776,
+    "ModuleName" : "riscx32_axi_adapter"
+   },
+   {
+    "InstFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+    "InstLine" : 2719,
+    "InstName" : "riscx32_core",
+    "ModuleFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+    "ModuleLine" : 84,
+    "ModuleName" : "riscx32"
+   }
+  ]
+ },
+ {
+  "InstFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+  "InstLine" : 2860,
+  "InstName" : "riscx32_wb",
+  "ModuleFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+  "ModuleLine" : 2860,
+  "ModuleName" : "riscx32_wb",
+  "SubInsts" : [
+   {
+    "InstFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+    "InstLine" : 2983,
+    "InstName" : "riscx32_core",
+    "ModuleFile" : "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/src/riscx32.v",
+    "ModuleLine" : 84,
+    "ModuleName" : "riscx32"
+   }
+  ]
+ }
+]
