@@ -1,23 +1,26 @@
 /*
-以下是通用寄存器，可以放任何数据，除此以外还有 pc rs1 rs2 等非通用寄存器
-寄存器 别名 描述
-x0	zero  零寄存器，值始终为 0，写入无效。
-x1	ra	  返回地址（Return Address），用于函数调用。
-x2	sp    栈指针（Stack Pointer），用于栈操作。
-x3	gp    全局指针（Global Pointer），用于访问全局变量。
-x4	tp    线程指针（Thread Pointer），用于线程局部存储。
-x5	t0    临时寄存器（Temporary Register 0）。
-x6	t1    临时寄存器（Temporary Register 1）。
-x7	t2    临时寄存器（Temporary Register 2）。
-x8	s0/fp 保存寄存器（Saved Register 0）或帧指针（Frame Pointer）。
-x9	s1    保存寄存器（Saved Register 1）。
-x10	a0    函数参数/返回值寄存器（Argument/Return Value 0）。
-x11	a1    函数参数/返回值寄存器（Argument/Return Value 1）。
-x12	a2    函数参数寄存器（Argument 2）。
-x13	a3    函数参数寄存器（Argument 3）。
-x14	a4    函数参数寄存器（Argument 4）。
-x15	a5    函数参数寄存器（Argument 5）。
-*/
+ *  PicoRV32 -- A Small RISC-V (RV32I) Processor Core
+ *
+ *  Copyright (C) 2015  Claire Xenia Wolf <claire@yosyshq.com>
+ *
+ *  Permission to use, copy, modify, and/or distribute this software for any
+ *  purpose with or without fee is hereby granted, provided that the above
+ *  copyright notice and this permission notice appear in all copies.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ *  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ *  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ *  ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ *  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ *  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ *  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ */
+
+/* verilator lint_off WIDTH */
+/* verilator lint_off PINMISSING */
+/* verilator lint_off CASEOVERLAP */
+/* verilator lint_off CASEINCOMPLETE */
 
 `timescale 1 ns / 1 ps
 // `default_nettype none
@@ -44,62 +47,59 @@ x15	a5    函数参数寄存器（Argument 5）。
   `define assert(assert_expr) empty_statement
 `endif
 
-// 使用自定义内存资源时使用这个，比如把通用寄存器和内存放到其他地方
 // uncomment this for register file in extra module
-// `define riscx32_REGS riscx32_regs
+// `define PICORV32_REGS picorv32_regs
 
 // this macro can be used to check if the verilog files in your
 // design are read in the correct order.
-`define riscx32_V
+`define PICORV32_V
 
 
 /***************************************************************
- * riscx32
+ * picorv32
  ***************************************************************/
 
-module riscx32 #(
-	parameter [ 0:0] ENABLE_COUNTERS = 1, // 一些周期计数器，用于分析代码性能
+module picorv32 #(
+	parameter [ 0:0] ENABLE_COUNTERS = 1,
 	parameter [ 0:0] ENABLE_COUNTERS64 = 1,
-	parameter [ 0:0] ENABLE_REGS_16_31 = 1, // I 扩展需要，E 扩展不需要
-	parameter [ 0:0] ENABLE_REGS_DUALPORT = 1, // 双端口，用于提升性能
-	parameter [ 0:0] LATCHED_MEM_RDATA = 0, // 时序方案选择
-	parameter [ 0:0] TWO_STAGE_SHIFT = 1, // 加快移位操作
-	parameter [ 0:0] BARREL_SHIFTER = 0, // 使用桶移位
-	parameter [ 0:0] TWO_CYCLE_COMPARE = 0, // 为条件分支指令改善时序
-	parameter [ 0:0] TWO_CYCLE_ALU = 0, // 为 ALU 改善时序
-	parameter [ 0:0] COMPRESSED_ISA = 0, // C 扩展，压缩指令
-	parameter [ 0:0] CATCH_MISALIGN = 1, // 捕获未对齐内存访问，将触发中断。中断不开就触发不了中断，其他会触发中断的也这样
-	parameter [ 0:0] CATCH_ILLINSN = 1, // 捕获非法指令，将触发中断
-	parameter [ 0:0] ENABLE_PCPI = 0, // 外部 PCPI 接口，会输出不支持的指令，如果外部连接了其他处理器可解析此指令并将结果传回来
-	parameter [ 0:0] ENABLE_MUL = 0, // 属于 M 扩展，硬件乘法。将由内部 PCPI 接口对接
-	parameter [ 0:0] ENABLE_FAST_MUL = 0, // 快速乘法，会覆盖 ENABLE_MUL
-	parameter [ 0:0] ENABLE_DIV = 0, // 属于 M 扩展，硬件的除法和取余
-	parameter [ 0:0] ENABLE_IRQ = 0, // 中断的支持，如果不打开将无法调用任何中断
-	parameter [ 0:0] ENABLE_IRQ_QREGS = 1, // 中断的 q 寄存器，非标准。若不启用则使用 x3 x4 存储
-	parameter [ 0:0] ENABLE_IRQ_TIMER = 1, // 定时器的支持
-	parameter [ 0:0] ENABLE_TRACE = 0, // 使用 trace_valid 和 trace_data 输出端口生成执行跟踪
-	parameter [ 0:0] REGS_INIT_ZERO = 0, // 将所有寄存器初始化为 0，用于测试
-	parameter [31:0] MASKED_IRQ = 32'h 0000_0000, // 永久禁用为 1 的位对应的中断
-	parameter [31:0] LATCHED_IRQ = 32'h ffff_ffff, // 为 1 的位的中断只要触发就被记下直到处理掉，为 0 的则过期不候
-	parameter [31:0] PROGADDR_RESET = 32'h 0000_0000, // 程序的起始地址
-	parameter [31:0] PROGADDR_IRQ = 32'h 0000_0010, // 中断处理程序的起始地址
-	parameter [31:0] STACKADDR = 32'h ffff_ffff // 当该参数的值不同于0xffffffff时，寄存器x2（堆栈指针）在复位时被初始化为该值。(All其它寄存器保持未初始化）。请注意，RISC-V调用约定要求堆栈指针在16字节边界上对齐（RV 32 I软浮点调用约定为4字节）
+	parameter [ 0:0] ENABLE_REGS_16_31 = 1,
+	parameter [ 0:0] ENABLE_REGS_DUALPORT = 1,
+	parameter [ 0:0] LATCHED_MEM_RDATA = 0,
+	parameter [ 0:0] TWO_STAGE_SHIFT = 1,
+	parameter [ 0:0] BARREL_SHIFTER = 0,
+	parameter [ 0:0] TWO_CYCLE_COMPARE = 0,
+	parameter [ 0:0] TWO_CYCLE_ALU = 0,
+	parameter [ 0:0] COMPRESSED_ISA = 0,
+	parameter [ 0:0] CATCH_MISALIGN = 1,
+	parameter [ 0:0] CATCH_ILLINSN = 1,
+	parameter [ 0:0] ENABLE_PCPI = 0,
+	parameter [ 0:0] ENABLE_MUL = 0,
+	parameter [ 0:0] ENABLE_FAST_MUL = 0,
+	parameter [ 0:0] ENABLE_DIV = 0,
+	parameter [ 0:0] ENABLE_IRQ = 0,
+	parameter [ 0:0] ENABLE_IRQ_QREGS = 1,
+	parameter [ 0:0] ENABLE_IRQ_TIMER = 1,
+	parameter [ 0:0] ENABLE_TRACE = 0,
+	parameter [ 0:0] REGS_INIT_ZERO = 0,
+	parameter [31:0] MASKED_IRQ = 32'h 0000_0000,
+	parameter [31:0] LATCHED_IRQ = 32'h ffff_ffff,
+	parameter [31:0] PROGADDR_RESET = 32'h 0000_0000,
+	parameter [31:0] PROGADDR_IRQ = 32'h 0000_0010,
+	parameter [31:0] STACKADDR = 32'h ffff_ffff
 ) (
 	input clk, resetn,
 	output reg trap,
 
-	// 下面两种内存接口共用的部分
 	output reg        mem_valid,
-	output reg        mem_instr, // 如果传输是为了取指令，内核将拉高 mem_instr
+	output reg        mem_instr,
 	input             mem_ready,
 
-	// 普通的内存接口
 	output reg [31:0] mem_addr,
 	output reg [31:0] mem_wdata,
-	output reg [ 3:0] mem_wstrb, // 有 8 种可能，0000、1111、1100、0011、1000、0100、0010、0001，即不写、写 32 位、写高 16 位、写低 16 位或写单个字节
+	output reg [ 3:0] mem_wstrb,
 	input      [31:0] mem_rdata,
 
-	// Look-Ahead Interface。前瞻内存接口，比普通接口早一个时钟周期提供下一次内存传输的所有信息，但对时序要求更高
+	// Look-Ahead Interface
 	output            mem_la_read,
 	output            mem_la_write,
 	output     [31:0] mem_la_addr,
@@ -117,8 +117,8 @@ module riscx32 #(
 	input             pcpi_ready,
 
 	// IRQ Interface
-	input      [31:0] irq, // 中断标志位，bit 对应的中断出发后将变为 1，但需启用中断功能
-	output reg [31:0] eoi, // bit 对应的中断进入中断处理时变为高，返回将变为低
+	input      [31:0] irq,
+	output reg [31:0] eoi,
 
 `ifdef RISCV_FORMAL
 	output reg        rvfi_valid,
@@ -158,31 +158,28 @@ module riscx32 #(
 	output reg        trace_valid,
 	output reg [35:0] trace_data
 );
-    // 0 ~ 2 号中断
-	localparam integer irq_timer = 0; // 定时器中断
-	localparam integer irq_ebreak = 1; // EBREAK/ECALL或非法指令
-	localparam integer irq_buserror = 2; // 总线错误（未对齐内存访问）
+	localparam integer irq_timer = 0;
+	localparam integer irq_ebreak = 1;
+	localparam integer irq_buserror = 2;
 
-	localparam integer irqregs_offset = ENABLE_REGS_16_31 ? 32 : 16; // 中断寄存器偏移
-	localparam integer regfile_size = (ENABLE_REGS_16_31 ? 32 : 16) + 4*ENABLE_IRQ*ENABLE_IRQ_QREGS; // 总寄存器大小。自定义中断单元有 4 个额外的寄存器
-	localparam integer regindex_bits = (ENABLE_REGS_16_31 ? 5 : 4) + ENABLE_IRQ*ENABLE_IRQ_QREGS; // 寄存器索引（编码?） bit 数
+	localparam integer irqregs_offset = ENABLE_REGS_16_31 ? 32 : 16;
+	localparam integer regfile_size = (ENABLE_REGS_16_31 ? 32 : 16) + 4*ENABLE_IRQ*ENABLE_IRQ_QREGS;
+	localparam integer regindex_bits = (ENABLE_REGS_16_31 ? 5 : 4) + ENABLE_IRQ*ENABLE_IRQ_QREGS;
 
-	localparam WITH_PCPI = ENABLE_PCPI || ENABLE_MUL || ENABLE_FAST_MUL || ENABLE_DIV; // 是否需启用 PCPI
+	localparam WITH_PCPI = ENABLE_PCPI || ENABLE_MUL || ENABLE_FAST_MUL || ENABLE_DIV;
 
-	// 追踪
 	localparam [35:0] TRACE_BRANCH = {4'b 0001, 32'b 0};
 	localparam [35:0] TRACE_ADDR   = {4'b 0010, 32'b 0};
 	localparam [35:0] TRACE_IRQ    = {4'b 1000, 32'b 0};
 
-	reg [63:0] count_cycle, count_instr; // 周期计数、指令计数
-	reg [31:0] reg_pc, reg_next_pc, reg_op1, reg_op2, reg_out; // 程序计数器（当前正在执行的指令的地址）、下一个程序计数器、操作数 1、操作数 2、结果
-	reg [4:0] reg_sh; // 像是临时用的
+	reg [63:0] count_cycle, count_instr;
+	reg [31:0] reg_pc, reg_next_pc, reg_op1, reg_op2, reg_out;
+	reg [4:0] reg_sh;
 
-	reg [31:0] next_insn_opcode; // 下一个指令的编码
+	reg [31:0] next_insn_opcode;
 	reg [31:0] dbg_insn_opcode;
 	reg [31:0] dbg_insn_addr;
 
-	// 调试用
 	wire dbg_mem_valid = mem_valid;
 	wire dbg_mem_instr = mem_instr;
 	wire dbg_mem_ready = mem_ready;
@@ -196,16 +193,15 @@ module riscx32 #(
 
 	wire [31:0] next_pc;
 
-	reg irq_delay; // 延迟
-	reg irq_active; // 激活
-	reg [31:0] irq_mask; // 中断屏蔽码
-	reg [31:0] irq_pending; // 中断挂起码
-	reg [31:0] timer; // 定时器
+	reg irq_delay;
+	reg irq_active;
+	reg [31:0] irq_mask;
+	reg [31:0] irq_pending;
+	reg [31:0] timer;
 
-`ifndef riscx32_REGS
-	reg [31:0] cpuregs [0:regfile_size-1]; // 通用寄存器组，E 扩展有 16 个，I 扩展有 32 个
+`ifndef PICORV32_REGS
+	reg [31:0] cpuregs [0:regfile_size-1];
 
-	// 是否需要初始化为 0
 	integer i;
 	initial begin
 		if (REGS_INIT_ZERO) begin
@@ -256,29 +252,25 @@ module riscx32 #(
 	wire [31:0] dbg_reg_x31 = cpuregs[31];
 `endif
 
-	// Internal PCPI Cores 内部 PCPI 接口
+	// Internal PCPI Cores
 
-	// mul
 	wire        pcpi_mul_wr;
 	wire [31:0] pcpi_mul_rd;
 	wire        pcpi_mul_wait;
 	wire        pcpi_mul_ready;
 
-	// div
 	wire        pcpi_div_wr;
 	wire [31:0] pcpi_div_rd;
 	wire        pcpi_div_wait;
 	wire        pcpi_div_ready;
 
-	// mul 和 div 连到一起
 	reg        pcpi_int_wr;
 	reg [31:0] pcpi_int_rd;
 	reg        pcpi_int_wait;
 	reg        pcpi_int_ready;
 
-	// MUL、DIV、REM 都属于 M 扩展，如果要用就一起用
-	generate if (ENABLE_FAST_MUL) begin // 实现硬件快速乘法
-		riscx32_pcpi_fast_mul pcpi_mul (
+	generate if (ENABLE_FAST_MUL) begin
+		picorv32_pcpi_fast_mul pcpi_mul (
 			.clk       (clk            ),
 			.resetn    (resetn         ),
 			.pcpi_valid(pcpi_valid     ),
@@ -290,8 +282,8 @@ module riscx32 #(
 			.pcpi_wait (pcpi_mul_wait  ),
 			.pcpi_ready(pcpi_mul_ready )
 		);
-	end else if (ENABLE_MUL) begin // 实现硬件乘法
-		riscx32_pcpi_mul pcpi_mul (
+	end else if (ENABLE_MUL) begin
+		picorv32_pcpi_mul pcpi_mul (
 			.clk       (clk            ),
 			.resetn    (resetn         ),
 			.pcpi_valid(pcpi_valid     ),
@@ -310,8 +302,8 @@ module riscx32 #(
 		assign pcpi_mul_ready = 0;
 	end endgenerate
 
-	generate if (ENABLE_DIV) begin // 实现硬件除法和取余
-		riscx32_pcpi_div pcpi_div (
+	generate if (ENABLE_DIV) begin
+		picorv32_pcpi_div pcpi_div (
 			.clk       (clk            ),
 			.resetn    (resetn         ),
 			.pcpi_valid(pcpi_valid     ),
@@ -330,7 +322,6 @@ module riscx32 #(
 		assign pcpi_div_ready = 0;
 	end endgenerate
 
-	// 将这些结果保存到 pcpi_int 寄存器，pcpi_mul 和 pcpi_div 都是线
 	always @* begin
 		pcpi_int_wr = 0;
 		pcpi_int_rd = 32'bx;
@@ -355,7 +346,7 @@ module riscx32 #(
 	end
 
 
-	// Memory Interface 内存接口
+	// Memory Interface
 
 	reg [1:0] mem_state;
 	reg [1:0] mem_wordsize;
@@ -366,7 +357,7 @@ module riscx32 #(
 	reg mem_do_rdata;
 	reg mem_do_wdata;
 
-	wire mem_xfer; // 内存正在传输时为 1
+	wire mem_xfer;
 	reg mem_la_secondword, mem_la_firstword_reg, last_mem_valid;
 	wire mem_la_firstword = COMPRESSED_ISA && (mem_do_prefetch || mem_do_rinst) && next_pc[1] && !mem_la_secondword;
 	wire mem_la_firstword_xfer = COMPRESSED_ISA && mem_xfer && (!last_mem_valid ? mem_la_firstword : mem_la_firstword_reg);
@@ -379,7 +370,7 @@ module riscx32 #(
 	wire [31:0] mem_rdata_latched;
 
 	wire mem_la_use_prefetched_high_word = COMPRESSED_ISA && mem_la_firstword && prefetched_high_word && !clear_prefetched_high_word;
-	assign mem_xfer = (mem_valid && mem_ready) || (mem_la_use_prefetched_high_word && mem_do_rinst); // 内存正在传输
+	assign mem_xfer = (mem_valid && mem_ready) || (mem_la_use_prefetched_high_word && mem_do_rinst);
 
 	wire mem_busy = |{mem_do_prefetch, mem_do_rinst, mem_do_rdata, mem_do_wdata};
 	wire mem_done = resetn && ((mem_xfer && |mem_state && (mem_do_rinst || mem_do_rdata || mem_do_wdata)) || (&mem_state && mem_do_rinst)) &&
@@ -392,12 +383,10 @@ module riscx32 #(
 
 	assign mem_rdata_latched_noshuffle = (mem_xfer || LATCHED_MEM_RDATA) ? mem_rdata : mem_rdata_q;
 
-	// 涉及 C 扩展
 	assign mem_rdata_latched = COMPRESSED_ISA && mem_la_use_prefetched_high_word ? {16'bx, mem_16bit_buffer} :
 			COMPRESSED_ISA && mem_la_secondword ? {mem_rdata_latched_noshuffle[15:0], mem_16bit_buffer} :
 			COMPRESSED_ISA && mem_la_firstword ? {16'bx, mem_rdata_latched_noshuffle[31:16]} : mem_rdata_latched_noshuffle;
 
-	// 前瞻内存的第一个字和最后一次有效
 	always @(posedge clk) begin
 		if (!resetn) begin
 			mem_la_firstword_reg <= 0;
@@ -409,7 +398,6 @@ module riscx32 #(
 		end
 	end
 
-	// 内存读写
 	always @* begin
 		(* full_case *)
 		case (mem_wordsize)
@@ -439,20 +427,16 @@ module riscx32 #(
 		endcase
 	end
 
-	// 压缩指令的解压
 	always @(posedge clk) begin
-	    // 如果内存正在传输
 		if (mem_xfer) begin
 			mem_rdata_q <= COMPRESSED_ISA ? mem_rdata_latched : mem_rdata;
 			next_insn_opcode <= COMPRESSED_ISA ? mem_rdata_latched : mem_rdata;
 		end
 
-		// 压缩指令还原到未压缩的指令
 		if (COMPRESSED_ISA && mem_done && (mem_do_prefetch || mem_do_rinst)) begin
-			case (mem_rdata_latched[1:0]) // 先根据低 2bit 来判断
+			case (mem_rdata_latched[1:0])
 				2'b00: begin // Quadrant 0
-					case (mem_rdata_latched[15:13]) // 再根据低 16bit 的高 2bit 判断
-					    // 指令还原
+					case (mem_rdata_latched[15:13])
 						3'b000: begin // C.ADDI4SPN
 							mem_rdata_q[14:12] <= 3'b000;
 							mem_rdata_q[31:20] <= {2'b0, mem_rdata_latched[10:7], mem_rdata_latched[12:11], mem_rdata_latched[5], mem_rdata_latched[6], 2'b00};
@@ -559,7 +543,6 @@ module riscx32 #(
 		end
 	end
 
-	// 一些断言，没有处理
 	always @(posedge clk) begin
 		if (resetn && !trap) begin
 			if (mem_do_prefetch || mem_do_rinst || mem_do_rdata)
@@ -579,7 +562,6 @@ module riscx32 #(
 		end
 	end
 
-	// 内存状态机
 	always @(posedge clk) begin
 		if (!resetn || trap) begin
 			if (!resetn)
@@ -659,7 +641,7 @@ module riscx32 #(
 	end
 
 
-	// Instruction Decoder 指令解码
+	// Instruction Decoder
 
 	reg instr_lui, instr_auipc, instr_jal, instr_jalr;
 	reg instr_beq, instr_bne, instr_blt, instr_bge, instr_bltu, instr_bgeu;
@@ -716,7 +698,6 @@ module riscx32 #(
 	`FORMAL_KEEP reg dbg_rs1val_valid;
 	`FORMAL_KEEP reg dbg_rs2val_valid;
 
-	// 给人看指令的字符串表示，看当前的指令
 	always @* begin
 		new_ascii_instr = "";
 
@@ -768,7 +749,6 @@ module riscx32 #(
 		if (instr_rdinstrh) new_ascii_instr = "rdinstrh";
 		if (instr_fence)    new_ascii_instr = "fence";
 
-		// custom
 		if (instr_getq)     new_ascii_instr = "getq";
 		if (instr_setq)     new_ascii_instr = "setq";
 		if (instr_retirq)   new_ascii_instr = "retirq";
@@ -1187,9 +1167,8 @@ module riscx32 #(
 	end
 
 
-	// Main State Machine 主状态机
+	// Main State Machine
 
-	// cpu 状态机分支编码
 	localparam cpu_state_trap   = 8'b10000000;
 	localparam cpu_state_fetch  = 8'b01000000;
 	localparam cpu_state_ld_rs1 = 8'b00100000;
@@ -1199,7 +1178,7 @@ module riscx32 #(
 	localparam cpu_state_stmem  = 8'b00000010;
 	localparam cpu_state_ldmem  = 8'b00000001;
 
-	reg [7:0] cpu_state; // 被赋值为不同的 cpu 状态机分支编码以进入对应的操作
+	reg [7:0] cpu_state;
 	reg [1:0] irq_state;
 
 	`FORMAL_KEEP reg [127:0] dbg_ascii_state;
@@ -1354,12 +1333,12 @@ module riscx32 #(
 		end
 	end
 
-`ifndef riscx32_REGS
+`ifndef PICORV32_REGS
 	always @(posedge clk) begin
 		if (resetn && cpuregs_write && latched_rd)
-`ifdef riscx32_TESTBUG_001
+`ifdef PICORV32_TESTBUG_001
 			cpuregs[latched_rd ^ 1] <= cpuregs_wrdata;
-`elsif riscx32_TESTBUG_002
+`elsif PICORV32_TESTBUG_002
 			cpuregs[latched_rd] <= cpuregs_wrdata ^ 1;
 `else
 			cpuregs[latched_rd] <= cpuregs_wrdata;
@@ -1394,7 +1373,7 @@ module riscx32 #(
 	wire [5:0] cpuregs_raddr1 = ENABLE_REGS_DUALPORT ? decoded_rs1 : decoded_rs;
 	wire [5:0] cpuregs_raddr2 = ENABLE_REGS_DUALPORT ? decoded_rs2 : 0;
 
-	`riscx32_REGS cpuregs (
+	`PICORV32_REGS cpuregs (
 		.clk(clk),
 		.wen(resetn && cpuregs_write && latched_rd),
 		.waddr(cpuregs_waddr),
@@ -1504,7 +1483,6 @@ module riscx32 #(
 			cpu_state <= cpu_state_fetch;
 		end else
 		(* parallel_case, full_case *)
-		// cpu 核心的指令工作状态机
 		case (cpu_state)
 			cpu_state_trap: begin
 				trap <= 1;
@@ -2034,12 +2012,12 @@ module riscx32 #(
 			rvfi_rd_wdata <= 0;
 		end else
 		if (cpuregs_write && !irq_state) begin
-`ifdef riscx32_TESTBUG_003
+`ifdef PICORV32_TESTBUG_003
 			rvfi_rd_addr <= latched_rd ^ 1;
 `else
 			rvfi_rd_addr <= latched_rd;
 `endif
-`ifdef riscx32_TESTBUG_004
+`ifdef PICORV32_TESTBUG_004
 			rvfi_rd_wdata <= latched_rd ? cpuregs_wrdata ^ 1 : 0;
 `else
 			rvfi_rd_wdata <= latched_rd ? cpuregs_wrdata : 0;
@@ -2084,7 +2062,7 @@ module riscx32 #(
 	end
 
 	always @* begin
-`ifdef riscx32_TESTBUG_005
+`ifdef PICORV32_TESTBUG_005
 		rvfi_pc_wdata = (dbg_irq_call ? dbg_irq_ret : dbg_insn_addr) ^ 4;
 `else
 		rvfi_pc_wdata = dbg_irq_call ? dbg_irq_ret : dbg_insn_addr;
@@ -2188,12 +2166,12 @@ module riscx32 #(
 `endif
 endmodule
 
-// This is a simple example implementation of riscx32_REGS.
-// Use the riscx32_REGS mechanism if you want to use custom
+// This is a simple example implementation of PICORV32_REGS.
+// Use the PICORV32_REGS mechanism if you want to use custom
 // memory resources to implement the processor register file.
 // Note that your implementation must match the requirements of
-// the riscx32 configuration. (e.g. QREGS, etc)
-module riscx32_regs (
+// the PicoRV32 configuration. (e.g. QREGS, etc)
+module picorv32_regs (
 	input clk, wen,
 	input [5:0] waddr,
 	input [5:0] raddr1,
@@ -2213,10 +2191,10 @@ endmodule
 
 
 /***************************************************************
- * riscx32_pcpi_mul
+ * picorv32_pcpi_mul
  ***************************************************************/
 
-module riscx32_pcpi_mul #(
+module picorv32_pcpi_mul #(
 	parameter STEPS_AT_ONCE = 1,
 	parameter CARRY_CHAIN = 4
 ) (
@@ -2337,7 +2315,7 @@ module riscx32_pcpi_mul #(
 	end
 endmodule
 
-module riscx32_pcpi_fast_mul #(
+module picorv32_pcpi_fast_mul #(
 	parameter EXTRA_MUL_FFS = 0,
 	parameter EXTRA_INSN_FFS = 0,
 	parameter MUL_CLKGATE = 0
@@ -2436,10 +2414,10 @@ endmodule
 
 
 /***************************************************************
- * riscx32_pcpi_div
+ * picorv32_pcpi_div
  ***************************************************************/
 
-module riscx32_pcpi_div (
+module picorv32_pcpi_div (
 	input clk, resetn,
 
 	input             pcpi_valid,
@@ -2533,10 +2511,10 @@ endmodule
 
 
 /***************************************************************
- * riscx32_axi
+ * picorv32_axi
  ***************************************************************/
 
-module riscx32_axi #(
+module picorv32_axi #(
 	parameter [ 0:0] ENABLE_COUNTERS = 1,
 	parameter [ 0:0] ENABLE_COUNTERS64 = 1,
 	parameter [ 0:0] ENABLE_REGS_16_31 = 1,
@@ -2638,7 +2616,7 @@ module riscx32_axi #(
 	wire        mem_ready;
 	wire [31:0] mem_rdata;
 
-	riscx32_axi_adapter axi_adapter (
+	picorv32_axi_adapter axi_adapter (
 		.clk            (clk            ),
 		.resetn         (resetn         ),
 		.mem_axi_awvalid(mem_axi_awvalid),
@@ -2667,7 +2645,7 @@ module riscx32_axi #(
 		.mem_rdata      (mem_rdata      )
 	);
 
-	riscx32 #(
+	picorv32 #(
 		.ENABLE_COUNTERS     (ENABLE_COUNTERS     ),
 		.ENABLE_COUNTERS64   (ENABLE_COUNTERS64   ),
 		.ENABLE_REGS_16_31   (ENABLE_REGS_16_31   ),
@@ -2693,7 +2671,7 @@ module riscx32_axi #(
 		.PROGADDR_RESET      (PROGADDR_RESET      ),
 		.PROGADDR_IRQ        (PROGADDR_IRQ        ),
 		.STACKADDR           (STACKADDR           )
-	) riscx32_core (
+	) picorv32_core (
 		.clk      (clk   ),
 		.resetn   (resetn),
 		.trap     (trap  ),
@@ -2747,10 +2725,10 @@ endmodule
 
 
 /***************************************************************
- * riscx32_axi_adapter
+ * picorv32_axi_adapter
  ***************************************************************/
 
-module riscx32_axi_adapter (
+module picorv32_axi_adapter (
 	input clk, resetn,
 
 	// AXI4-lite master memory interface
@@ -2777,7 +2755,7 @@ module riscx32_axi_adapter (
 	output        mem_axi_rready,
 	input  [31:0] mem_axi_rdata,
 
-	// Native riscx32 memory interface
+	// Native PicoRV32 memory interface
 
 	input         mem_valid,
 	input         mem_instr,
@@ -2831,10 +2809,10 @@ endmodule
 
 
 /***************************************************************
- * riscx32_wb
+ * picorv32_wb
  ***************************************************************/
 
-module riscx32_wb #(
+module picorv32_wb #(
 	parameter [ 0:0] ENABLE_COUNTERS = 1,
 	parameter [ 0:0] ENABLE_COUNTERS64 = 1,
 	parameter [ 0:0] ENABLE_REGS_16_31 = 1,
@@ -2931,7 +2909,7 @@ module riscx32_wb #(
 	assign clk = wb_clk_i;
 	assign resetn = ~wb_rst_i;
 
-	riscx32 #(
+	picorv32 #(
 		.ENABLE_COUNTERS     (ENABLE_COUNTERS     ),
 		.ENABLE_COUNTERS64   (ENABLE_COUNTERS64   ),
 		.ENABLE_REGS_16_31   (ENABLE_REGS_16_31   ),
@@ -2957,7 +2935,7 @@ module riscx32_wb #(
 		.PROGADDR_RESET      (PROGADDR_RESET      ),
 		.PROGADDR_IRQ        (PROGADDR_IRQ        ),
 		.STACKADDR           (STACKADDR           )
-	) riscx32_core (
+	) picorv32_core (
 		.clk      (clk   ),
 		.resetn   (resetn),
 		.trap     (trap  ),
