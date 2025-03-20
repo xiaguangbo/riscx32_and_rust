@@ -7,6 +7,7 @@ Running placement......
 [10%] Placement Phase 0 completed
 [20%] Placement Phase 1 completed
 [30%] Placement Phase 2 completed
+WARN  (TA1132) :  'riscx32_core/n593_15' was determined to be a clock but was not created.
 [50%] Placement Phase 3 completed
 Running routing......
 [60%] Routing Phase 0 completed
@@ -26,5 +27,5 @@ Generate file "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18
 Generate file "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/impl/pnr/project.rpt.html" completed
 Generate file "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/impl/pnr/project.rpt.txt" completed
 Generate file "/home/xiaguangbo/linux/project/riscx32_and_rust/program_gw2arlv18qn88c817/project/impl/pnr/project.tr.html" completed
-Wed Mar 19 14:19:53 2025
+Thu Mar 20 21:18:30 2025
 

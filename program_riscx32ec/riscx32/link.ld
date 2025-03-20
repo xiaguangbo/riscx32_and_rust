@@ -1,7 +1,7 @@
 MEMORY
 {
-    FLASH : ORIGIN = 0x00000000, LENGTH = 1K
-    RAM   : ORIGIN = 0x00000400, LENGTH = 1K
+    rom : ORIGIN = 0x00000000, LENGTH = 1K
+    ram : ORIGIN = 0x00000400, LENGTH = 1K
 }
 
 SECTIONS
@@ -10,11 +10,11 @@ SECTIONS
     {
         *(.init*)
         *(.text*)
-    } > FLASH
+    } > rom
 
     .stack :
     {
-        . = ORIGIN(RAM) + LENGTH(RAM);
+        . = ORIGIN(ram) + LENGTH(ram);
         _stack_top = .;
-    } > RAM
+    } > ram
 }
